@@ -5,6 +5,21 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/workspace
+      - ./data:/data
     working_dir: /workspace
     stdin_open: true
     tty: true
+    environment:
+      - PYTHONPATH=/workspace/src/python
+
+  faf:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspace
+      - ./data:/data
+    working_dir: /workspace
+    environment:
+      - PYTHONPATH=/workspace/src/python
+    entrypoint: ["python", "-m", "faf.cli.main"]

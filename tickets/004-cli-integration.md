@@ -1,7 +1,20 @@
 # TICKET-004: CLI Tool Integration
 
 ## Status
-NOT STARTED
+COMPLETE
+
+## Claude Code Working Area
+- [x] Read ticket and explore codebase
+- [x] Create CLI module with Click-based commands
+- [x] Implement download, parse, info, fetch commands
+- [x] Update pyproject.toml with entry point
+- [x] Update Dockerfile to install click and requests
+- [x] Update docker-compose.yml with faf service
+- [x] Update README.md with CLI usage examples
+- [x] Create unit tests (19 tests)
+- [x] Run black and ruff checks
+- [x] Run tests and verify (60 total tests passing)
+- [x] Self-review and update status
 
 ## Priority
 P1-High
@@ -10,19 +23,19 @@ P1-High
 Create a command-line interface that exposes the map download and parsing functionality. Users should be able to run simple commands via docker-compose to fetch maps and extract data from them.
 
 ## Acceptance Criteria
-- [ ] `src/python/faf/cli/main.py` exists with CLI entry point
-- [ ] CLI uses `click` library for argument parsing
-- [ ] Command `faf download <url> [--output-dir DIR]` downloads and extracts a map
-- [ ] Command `faf parse <scmap_path> [--output FORMAT]` parses an .scmap file
-- [ ] Command `faf info <scmap_path>` prints map metadata summary
-- [ ] Command `faf fetch <url> [--output-dir DIR]` downloads AND parses (convenience)
-- [ ] All commands have `--help` documentation
-- [ ] Exit codes: 0 for success, 1 for user error, 2 for system error
-- [ ] Errors print human-readable messages to stderr
-- [ ] `pyproject.toml` configured with `[project.scripts]` entry point
-- [ ] `docker-compose.yml` updated with convenient command aliases
-- [ ] README.md updated with CLI usage examples
-- [ ] Tests for CLI argument parsing and error handling
+- [x] `src/python/faf/cli/main.py` exists with CLI entry point
+- [x] CLI uses `click` library for argument parsing
+- [x] Command `faf download <url> [--output-dir DIR]` downloads and extracts a map
+- [x] Command `faf parse <scmap_path> [--output FORMAT]` parses an .scmap file
+- [x] Command `faf info <scmap_path>` prints map metadata summary
+- [x] Command `faf fetch <url> [--output-dir DIR]` downloads AND parses (convenience)
+- [x] All commands have `--help` documentation
+- [x] Exit codes: 0 for success, 1 for user error, 2 for system error
+- [x] Errors print human-readable messages to stderr
+- [x] `pyproject.toml` configured with `[project.scripts]` entry point
+- [x] `docker-compose.yml` updated with convenient command aliases
+- [x] README.md updated with CLI usage examples
+- [x] Tests for CLI argument parsing and error handling
 
 ## Technical Context
 
