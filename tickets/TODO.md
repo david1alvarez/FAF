@@ -18,3 +18,4 @@ An active list of found requirements, out-of-scope work, and potential issues fo
 
 
 ## Completed TODOs
+    [x] TODO-001: Register pytest 'integration' marker in pyproject.toml to eliminate warning

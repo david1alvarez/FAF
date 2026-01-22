@@ -1,7 +1,19 @@
 # TICKET-003: Map Download Utility
 
 ## Status
-NOT STARTED
+COMPLETE
+
+## Claude Code Working Area
+- [x] Read ticket and explore codebase
+- [x] Create downloader module with MapDownloader class
+- [x] Implement download by URL
+- [x] Implement retry logic with exponential backoff
+- [x] Implement map name lookup via FAF API
+- [x] Create unit tests (mocked HTTP)
+- [x] Create integration tests
+- [x] Run black and ruff checks
+- [x] Run tests and fix any issues (41 tests passing)
+- [x] Self-review and update status
 
 ## Priority
 P0-Critical
@@ -10,18 +22,18 @@ P0-Critical
 Implement a Python utility to download maps from the FAF content server. Given a map URL or map name, the utility will download the zip archive, extract it, and return the path to the extracted map directory containing the .scmap file.
 
 ## Acceptance Criteria
-- [ ] `src/python/faf/downloader/maps.py` exists with `MapDownloader` class
-- [ ] Can download map by direct URL: `https://content.faforever.com/maps/mapname.zip`
-- [ ] Can download map by name using FAF API to resolve URL
-- [ ] Extracts downloaded zip to specified output directory
-- [ ] Returns `MapInfo` dataclass with paths to key files (.scmap, _scenario.lua, etc.)
-- [ ] Handles HTTP errors gracefully with meaningful exceptions
-- [ ] Implements retry logic (3 attempts with exponential backoff)
-- [ ] Validates downloaded zip contains expected map structure
-- [ ] Unit tests exist in `tests/python/downloader/test_maps.py`
-- [ ] Integration test exists that downloads a real (small) map
-- [ ] Code passes `black` and `ruff` checks
-- [ ] All public functions have type hints and docstrings
+- [x] `src/python/faf/downloader/maps.py` exists with `MapDownloader` class
+- [x] Can download map by direct URL: `https://content.faforever.com/maps/mapname.zip`
+- [x] Can download map by name using FAF API to resolve URL
+- [x] Extracts downloaded zip to specified output directory
+- [x] Returns `MapInfo` dataclass with paths to key files (.scmap, _scenario.lua, etc.)
+- [x] Handles HTTP errors gracefully with meaningful exceptions
+- [x] Implements retry logic (3 attempts with exponential backoff)
+- [x] Validates downloaded zip contains expected map structure
+- [x] Unit tests exist in `tests/python/downloader/test_maps.py`
+- [x] Integration test exists that downloads a real (small) map
+- [x] Code passes `black` and `ruff` checks
+- [x] All public functions have type hints and docstrings
 
 ## Technical Context
 
