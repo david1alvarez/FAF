@@ -15,6 +15,7 @@ An active list of found requirements, out-of-scope work, and potential issues fo
 ```
 
 ## Open TODOs
+    [ ] TODO-002: FAF API requires OAuth authentication (403 Forbidden). Need to implement OAuth flow or find alternative map discovery method.
 
 
 ## Completed TODOs
