@@ -29,7 +29,9 @@ RUN python -m pip install --upgrade pip && \
     python -m pip install --no-cache-dir \
     numpy \
     torch --index-url https://download.pytorch.org/whl/cpu \
-    pillow
+    pillow \
+    click \
+    requests
 
 # Install Gradle
 RUN curl -fsSL "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" -o /tmp/gradle.zip && \

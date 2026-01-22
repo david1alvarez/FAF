@@ -1,3 +1,19 @@
+[project]
+name = "faf-map-ai"
+version = "0.1.0"
+description = "Tools for training AI models that generate Supreme Commander maps"
+requires-python = ">=3.11"
+dependencies = [
+    "click",
+    "numpy",
+    "requests",
+    "torch",
+    "pillow",
+]
+
+[project.scripts]
+faf = "faf.cli.main:cli"
+
 [tool.pytest.ini_options]
 markers = [
     "integration: marks tests as integration tests (may require network access)",
