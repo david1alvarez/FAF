@@ -9,6 +9,8 @@ P0-Critical
 ## Description
 Extend the map download utility to support bulk downloading of maps from the FAF vault. The downloader should handle parallel downloads, checkpointing for resume capability, and graceful error handling for failed downloads.
 
+**Note:** Due to FAF API requiring OAuth authentication (see TODO-002), this ticket includes a static URL fallback mechanism. This fallback should be removed once TICKET-010 (OAuth implementation) is complete.
+
 ## Acceptance Criteria
 - [ ] `src/python/faf/downloader/bulk.py` exists with `BulkDownloader` class
 - [ ] Supports parallel downloads with configurable concurrency (default: 4)
@@ -16,7 +18,9 @@ Extend the map download utility to support bulk downloading of maps from the FAF
 - [ ] Resumes from checkpoint if interrupted
 - [ ] Logs failed downloads to `failures.json` without halting
 - [ ] CLI command: `faf bulk-download --limit N --output-dir DIR`
-- [ ] Supports filtering via API filters (size, player count)
+- [ ] Supports filtering via API filters (size, player count) - when API auth available
+- [ ] **Supports `--from-file FILE` flag to read URLs from static file**
+- [ ] **Ships with `data/seed_map_urls.txt` containing 200+ curated map URLs**
 - [ ] Progress reporting to stdout (maps downloaded / total)
 - [ ] Unit tests for download logic and checkpointing
 - [ ] Integration test with small batch (5 maps)
@@ -26,7 +30,10 @@ Extend the map download utility to support bulk downloading of maps from the FAF
 
 ### Bulk Download Flow
 ```
-1. Query FAF API for map list (paginated)
+1. Determine map source:
+   a. If --from-file provided: Read URLs from file
+   b. Else if API auth available: Query FAF API (paginated)
+   c. Else: Fall back to data/seed_map_urls.txt with warning
 2. Load checkpoint if exists (skip already downloaded)
 3. Download maps in parallel (ThreadPoolExecutor)
 4. For each successful download:
@@ -38,6 +45,28 @@ Extend the map download utility to support bulk downloading of maps from the FAF
    - Continue with remaining maps
 6. Print summary on completion
 ```
+
+### Static URL Fallback (Temporary)
+Until TICKET-010 (OAuth) is implemented, provide a curated seed list:
+
+```
+# data/seed_map_urls.txt
+# Curated list of FAF map URLs for bulk download
+# This file is a temporary fallback until OAuth is implemented (TICKET-010)
+# Format: one URL per line, comments start with #
+
+https://content.faforever.com/maps/setons_clutch.v0003.zip
+https://content.faforever.com/maps/theta_passage_5.v0001.zip
+https://content.faforever.com/maps/dual_gap_adaptive.v0012.zip
+# ... 200+ maps covering various sizes and player counts
+```
+
+**Seed List Curation Criteria:**
+- Include maps of all sizes: 5km, 10km, 20km, 40km
+- Include various player counts: 2, 4, 6, 8, 10+
+- Prioritize ranked/popular maps
+- Exclude maps known to have parsing issues
+- Target ~250 maps for initial ML experimentation
 
 ### Checkpointing
 ```json
@@ -66,10 +95,13 @@ Extend the map download utility to support bulk downloading of maps from the FAF
 
 ### CLI Interface
 ```bash
-# Download 100 maps
+# Download from static seed list (default fallback)
 faf bulk-download --limit 100 --output-dir /data/maps
 
-# Download with filters
+# Download from custom URL file
+faf bulk-download --from-file my_urls.txt --output-dir /data/maps
+
+# Download with API filters (requires OAuth - TICKET-010)
 faf bulk-download --limit 500 --min-size 512 --players 8 --output-dir /data/maps
 
 # Resume interrupted download
@@ -77,6 +109,9 @@ faf bulk-download --resume --output-dir /data/maps
 
 # Parallel downloads
 faf bulk-download --limit 100 --concurrency 8 --output-dir /data/maps
+
+# Explicitly use seed file (same as default when API unavailable)
+faf bulk-download --from-file data/seed_map_urls.txt --limit 50 --output-dir /data/maps
 ```
 
 ### Directory Structure After Completion
@@ -90,7 +125,10 @@ src/
         │   └── bulk.py        # NEW
         └── ...
 
-/data/maps/                    # Output directory
+data/
+└── seed_map_urls.txt          # Curated fallback URLs (until TICKET-010)
+
+/data/maps/                    # Output directory (runtime)
 ├── checkpoint.json
 ├── failures.json
 ├── setons_clutch.v0001/
@@ -128,6 +166,9 @@ Expected test cases:
 - `test_bulk_download_respects_limit`
 - `test_bulk_download_respects_concurrency`
 - `test_bulk_download_applies_filters`
+- `test_bulk_download_reads_from_file`
+- `test_bulk_download_skips_comments_in_url_file`
+- `test_bulk_download_falls_back_to_seed_file`
 
 ### Integration Test
 ```bash
@@ -150,9 +191,14 @@ docker-compose run --rm dev cat /data/maps/checkpoint.json
 ```
 
 ## Dependencies
-- TICKET-005: FAF API client for map discovery
+- TICKET-005: FAF API client for map discovery (when auth available)
 - TICKET-003: Single map downloader (reuse extraction logic)
+
+## Future Work
+- TICKET-010: FAF OAuth implementation will enable API-based discovery
+- Once TICKET-010 is complete, remove `data/seed_map_urls.txt` fallback
 
 ## References
 - ThreadPoolExecutor: https://docs.python.org/3/library/concurrent.futures.html
 - File locking: https://docs.python.org/3/library/fcntl.html
+- FAF Content Server: https://content.faforever.com/maps/
