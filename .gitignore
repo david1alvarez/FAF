@@ -72,3 +72,6 @@ Thumbs.db
 
 # Project specific
 *.log
+/maps/
+/data/
+*.npy

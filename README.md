@@ -180,6 +180,26 @@ Run specific test file:
 docker compose run --rm dev bash -c "PYTHONPATH=src/python pytest tests/python/cli/test_main.py -v"
 ```
 
+## Debugging
+
+### "Command not found" errors
+
+If you see errors like `pytest: command not found` or similar, the Docker image may be outdated.
+Rebuild it with:
+
+```bash
+docker compose build --no-cache
+```
+
+### Stale containers
+
+If changes to `docker-compose.yml` or `Dockerfile` aren't taking effect, remove old containers:
+
+```bash
+docker compose down
+docker compose build --no-cache
+```
+
 ## License
 
 See LICENSE file for details.

@@ -26,7 +26,7 @@ RUN update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 &
 
 # Upgrade pip and install Python dependencies
 RUN python -m pip install --upgrade pip && \
-    python -m pip install --no-cache-dir numpy pillow click requests && \
+    python -m pip install --no-cache-dir numpy pillow click requests pytest black ruff && \
     python -m pip install --no-cache-dir torch --index-url https://download.pytorch.org/whl/cpu
 
 # Install Gradle
