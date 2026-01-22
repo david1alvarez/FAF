@@ -162,6 +162,15 @@ Refs: #issue-number (if applicable)
 - No linter errors
 - Ticket acceptance criteria met
 - Self-review completed
+- Ticket status updated
+    - `NOT STARTED` before development has begun
+    - `BLOCKED` if a blocking issue is discovered that must be completed before this ticket can be picked up
+    - `IN DEVELOPMENT` while working on the tickets new features or fixes
+    - `TESTING AND REVISIONS` while tests are being worked on and the code is being updated in response to failures
+    - `PENDING REVIEW` while performing the self review and asking clarifying/confirming questions
+    - `COMPLETE` when the ticket is ready for a GitHub PR
+- Out of scope requirements are documented as TODO-XXX (incrementing count) both inline and in tickets/TODO.md
+    - Resolved TODOs are removed from inline references and updated in tickets/TODO.md
 
 ## Docker Standards
 
@@ -204,6 +213,7 @@ RUN apt-get install -y curl
 - `CLAUDE.md`: This file (coding standards)
 - `tickets/README.md`: Ticket format specification
 - Docstrings on all public APIs
+- `tickets/TODO.md`: Existing and completed TODOs
 
 ### Markdown Style
 - One sentence per line (easier diffs)
@@ -239,14 +249,15 @@ RUN apt-get install -y curl
 ### When Implementing Tickets
 1. Read the full ticket before starting
 2. Check existing code for patterns to follow
-3. Write tests alongside implementation
-4. Run all tests before committing
-5. Update relevant documentation
+3. Create a plan in the Claude Code Working Area of the ticket, and update the status as you progress
+4. Write tests alongside implementation
+5. Run all tests before committing
+6. Update relevant documentation
 
 ### When Uncertain
 - State assumptions explicitly in PR description
 - Prefer conservative, working solutions over clever ones
-- Add TODO comments for known limitations
+- Add TODO comments for known limitations inline and in `tickets/TODO.md`
 
 ### Code Review Checklist
 - [ ] Acceptance criteria met
@@ -256,3 +267,4 @@ RUN apt-get install -y curl
 - [ ] No hardcoded values that should be config
 - [ ] Error messages are actionable
 - [ ] No security issues introduced
+- [ ] TODOs added for out of scope requirements

@@ -14,10 +14,10 @@ Each ticket is a standalone markdown file that must contain **all context necess
 Every ticket **must** include these sections in order:
 
 ```markdown
-# TICKET-XXX: [Title]
+# {FEAT|FIX}(XXX): [Title]
 
 ## Status
-[NOT STARTED | IN PROGRESS | BLOCKED | COMPLETE]
+[NOT STARTED | IN DEVELOPMENT | TESTING AND REVISIONS | PENDING REVIEW | BLOCKED | COMPLETE]
 
 ## Priority
 [P0-Critical | P1-High | P2-Medium | P3-Low]
@@ -41,6 +41,10 @@ Include links to external docs/specs if needed.]
 ## References
 [Links to relevant docs, prior tickets, or external resources.]
 ```
+
+## Claude Code Working Area
+(at the end of the document)
+[Working area for Claude Code's use for notes, plans, and additional discovered requirements]
 
 ### Optional Sections
 
