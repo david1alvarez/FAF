@@ -25,6 +25,7 @@ An active list of found requirements, out-of-scope work, and potential issues fo
     [ ] TODO-009: Add large file stress tests. Multi-GB zips, 1000+ concurrent downloads, memory efficiency not validated.
     [ ] TODO-010: Test multiple .scmap files in zip. Code picks first silently; behavior should be documented and tested.
     [ ] TODO-011: API response edge cases. Malformed JSON, missing attributes, null values in optional fields not tested.
+    [ ] TODO-012: Use authenticated FAF API for map discovery in bulk-download. Currently using seed file fallback; switch to API when OAuth credentials verified.
 
 
 ## Completed TODOs

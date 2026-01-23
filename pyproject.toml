@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "click",
     "numpy",
+    "pyyaml",
     "requests",
     "torch",
     "pillow",

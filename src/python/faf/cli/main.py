@@ -11,6 +11,11 @@ from typing import Optional
 import click
 import numpy as np
 
+from faf.api.auth import (
+    FAFAuthClient,
+    FAFAuthError,
+    has_credentials_in_environment,
+)
 from faf.downloader import BulkDownloader, DownloadProgress, MapDownloader, MapDownloadError
 from faf.parser import SCMapParser
 from faf.parser.scmap import SCMapParseError
@@ -293,12 +298,26 @@ def fetch(url: str, output_dir: Path) -> None:
     default=True,
     help="Resume from checkpoint if available (default: resume)",
 )
+@click.option(
+    "--auth-config",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="Path to YAML file with OAuth credentials (client_id, client_secret)",
+)
+@click.option(
+    "--no-auth",
+    is_flag=True,
+    default=False,
+    help="Disable authentication (use seed file fallback)",
+)
 def bulk_download(
     limit: Optional[int],
     output_dir: Path,
     from_file: Optional[Path],
     concurrency: int,
     resume: bool,
+    auth_config: Optional[Path],
+    no_auth: bool,
 ) -> None:
     """Download multiple maps in bulk.
 
@@ -307,6 +326,11 @@ def bulk_download(
 
     By default, uses a built-in seed list of map URLs. Use --from-file
     to specify a custom list of URLs.
+
+    Authentication: The command checks for OAuth credentials in this order:
+    1. --auth-config flag (path to YAML credentials file)
+    2. Environment variables: FAF_CLIENT_ID, FAF_CLIENT_SECRET
+    3. Falls back to seed file (with warning)
 
     Examples:
 
@@ -318,8 +342,48 @@ def bulk_download(
 
         # Resume interrupted download
         faf bulk-download --resume --output-dir /data/maps
+
+        # Use credentials from config file
+        faf bulk-download --auth-config ~/.faf/credentials.yaml --output-dir /data/maps
+
+        # Use environment variables for auth
+        export FAF_CLIENT_ID="your_client_id"
+        export FAF_CLIENT_SECRET="your_client_secret"
+        faf bulk-download --output-dir /data/maps
+
+        # Explicitly disable authentication
+        faf bulk-download --no-auth --output-dir /data/maps
     """
     try:
+        # Set up authentication if available and not disabled
+        # _auth_client is unused until TODO-012 is resolved (switch to API from seed file)
+        _auth_client: Optional[FAFAuthClient] = None
+        if not no_auth and not from_file:
+            # Try to get auth credentials
+            if auth_config:
+                try:
+                    _auth_client = FAFAuthClient.from_config_file(auth_config)
+                    click.echo(f"Using credentials from: {auth_config}")
+                except FAFAuthError as e:
+                    print_error(f"Failed to load auth config: {e}")
+                    sys.exit(EXIT_USER_ERROR)
+            elif has_credentials_in_environment():
+                try:
+                    _auth_client = FAFAuthClient.from_environment()
+                    click.echo("Using credentials from environment variables")
+                except FAFAuthError as e:
+                    print_error(f"Failed to load credentials from environment: {e}")
+                    sys.exit(EXIT_USER_ERROR)
+            else:
+                click.echo(
+                    click.style(
+                        "Warning: No OAuth credentials found. " "Using seed file fallback.",
+                        fg="yellow",
+                    )
+                )
+                click.echo("  Set FAF_CLIENT_ID and FAF_CLIENT_SECRET environment variables,")
+                click.echo("  or use --auth-config to specify a credentials file.")
+                click.echo()
 
         def progress_callback(progress: DownloadProgress) -> None:
             """Update progress display."""
@@ -349,6 +413,8 @@ def bulk_download(
             click.echo(f"Reading URLs from: {from_file}")
             progress = downloader.download_from_file(from_file, limit=limit, resume=resume)
         else:
+            # TODO-012: Use API with auth_client when credentials are verified
+            # For now, continue using seed file fallback
             click.echo("Using built-in seed URL list")
             click.echo("(Use --from-file to specify custom URLs)")
             try:

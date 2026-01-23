@@ -383,3 +383,52 @@ class TestMapListResult:
         assert result.total_records == 100
         assert result.total_pages == 10
         assert result.current_page == 1
+
+
+class TestFAFApiClientWithAuth:
+    """Tests for FAFApiClient with authentication."""
+
+    def test_client_uses_auth_header_when_auth_provided(self) -> None:
+        """Should include Authorization header when auth client is provided."""
+        from datetime import datetime, timedelta, timezone
+
+        from faf.api.auth import FAFAuthClient, FAFCredentials, FAFToken
+
+        # Create mock auth client with a cached token
+        creds = FAFCredentials(client_id="test", client_secret="secret")
+        auth_client = FAFAuthClient(credentials=creds)
+        auth_client._token = FAFToken(
+            access_token="test_token_123",
+            token_type="Bearer",
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            scope="public_profile",
+        )
+
+        client = FAFApiClient(auth_client=auth_client)
+
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = create_mock_response([])
+
+        with mock.patch("faf.api.client.requests.get", return_value=mock_response) as mock_get:
+            client.list_maps(page_size=10)
+
+        # Check that Authorization header was included
+        call_kwargs = mock_get.call_args[1]
+        assert "Authorization" in call_kwargs["headers"]
+        assert call_kwargs["headers"]["Authorization"] == "Bearer test_token_123"
+
+    def test_client_works_without_auth(self) -> None:
+        """Should work without auth client (no Authorization header)."""
+        client = FAFApiClient()
+
+        mock_response = mock.MagicMock()
+        mock_response.status_code = 200
+        mock_response.json.return_value = create_mock_response([])
+
+        with mock.patch("faf.api.client.requests.get", return_value=mock_response) as mock_get:
+            client.list_maps(page_size=10)
+
+        # Check that Authorization header was NOT included
+        call_kwargs = mock_get.call_args[1]
+        assert "Authorization" not in call_kwargs["headers"]
