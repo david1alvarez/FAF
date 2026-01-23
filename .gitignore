@@ -73,5 +73,6 @@ Thumbs.db
 # Project specific
 *.log
 /maps/
-/data/
+/data/*
+!/data/seed_map_urls.txt
 *.npy
