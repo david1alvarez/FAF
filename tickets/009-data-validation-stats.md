@@ -1,7 +1,17 @@
 # TICKET-009: Data Validation & Statistics
 
 ## Status
-NOT STARTED
+PENDING REVIEW
+
+## Claude Code Working Area
+- [x] Read ticket and understand requirements
+- [x] Implement validate.py with DatasetValidator class
+- [x] Implement stats.py with DatasetStats class
+- [x] Add dataset-validate CLI command
+- [x] Add dataset-info CLI command
+- [x] Add unit tests for validation and stats (40 new tests)
+- [x] Run black and ruff checks
+- [x] Self-review and update status
 
 ## Priority
 P1-High
@@ -10,18 +20,18 @@ P1-High
 Implement validation checks and statistical analysis for the preprocessed dataset. This ensures data quality before training and provides insights into dataset composition that inform model design decisions.
 
 ## Acceptance Criteria
-- [ ] `src/python/faf/preprocessing/validate.py` exists with `DatasetValidator` class
-- [ ] `src/python/faf/preprocessing/stats.py` exists with `DatasetStats` class
-- [ ] Validates heightmap values are in [0, 1] range
-- [ ] Validates heightmap dimensions match metadata
-- [ ] Validates splits are disjoint and cover all samples
-- [ ] Generates dataset statistics: size distribution, terrain types, player counts
-- [ ] CLI command: `faf dataset-info /data/dataset`
-- [ ] CLI command: `faf dataset-validate /data/dataset`
-- [ ] Validation outputs machine-readable JSON report
-- [ ] Stats outputs human-readable summary and optional JSON
-- [ ] Unit tests for validation and stats logic
-- [ ] Code passes `black` and `ruff` checks
+- [x] `src/python/faf/preprocessing/validate.py` exists with `DatasetValidator` class
+- [x] `src/python/faf/preprocessing/stats.py` exists with `DatasetStats` class
+- [x] Validates heightmap values are in [0, 1] range
+- [x] Validates heightmap dimensions match metadata
+- [x] Validates splits are disjoint and cover all samples
+- [x] Generates dataset statistics: size distribution, terrain types, player counts
+- [x] CLI command: `faf dataset-info /data/dataset`
+- [x] CLI command: `faf dataset-validate /data/dataset`
+- [x] Validation outputs machine-readable JSON report
+- [x] Stats outputs human-readable summary and optional JSON
+- [x] Unit tests for validation and stats logic (40 new tests, 232 total)
+- [x] Code passes `black` and `ruff` checks
 
 ## Technical Context
 
