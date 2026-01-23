@@ -11,7 +11,7 @@ from typing import Optional
 import click
 import numpy as np
 
-from faf.downloader import MapDownloader, MapDownloadError
+from faf.downloader import BulkDownloader, DownloadProgress, MapDownloader, MapDownloadError
 from faf.parser import SCMapParser
 from faf.parser.scmap import SCMapParseError
 
@@ -251,6 +251,123 @@ def fetch(url: str, output_dir: Path) -> None:
         sys.exit(EXIT_USER_ERROR)
     except SCMapParseError as e:
         print_error(f"Failed to parse downloaded map: {e}")
+        sys.exit(EXIT_USER_ERROR)
+    except Exception as e:
+        print_error(f"Unexpected error: {e}")
+        sys.exit(EXIT_SYSTEM_ERROR)
+
+
+@cli.command("bulk-download")
+@click.option(
+    "--limit",
+    "-n",
+    type=int,
+    default=None,
+    help="Maximum number of maps to download",
+)
+@click.option(
+    "--output-dir",
+    "-o",
+    type=click.Path(path_type=Path),
+    default=Path("./maps"),
+    help="Directory to download maps to (default: ./maps)",
+)
+@click.option(
+    "--from-file",
+    "-f",
+    type=click.Path(exists=True, path_type=Path),
+    default=None,
+    help="File containing map URLs (one per line)",
+)
+@click.option(
+    "--concurrency",
+    "-c",
+    type=int,
+    default=4,
+    help="Number of parallel downloads (default: 4)",
+)
+@click.option(
+    "--resume/--no-resume",
+    default=True,
+    help="Resume from checkpoint if available (default: resume)",
+)
+def bulk_download(
+    limit: Optional[int],
+    output_dir: Path,
+    from_file: Optional[Path],
+    concurrency: int,
+    resume: bool,
+) -> None:
+    """Download multiple maps in bulk.
+
+    Downloads maps from the FAF content server with parallel downloads,
+    checkpointing for resume capability, and error logging.
+
+    By default, uses a built-in seed list of map URLs. Use --from-file
+    to specify a custom list of URLs.
+
+    Examples:
+
+        # Download 100 maps from seed list
+        faf bulk-download --limit 100 --output-dir /data/maps
+
+        # Download from custom URL file
+        faf bulk-download --from-file my_urls.txt --output-dir /data/maps
+
+        # Resume interrupted download
+        faf bulk-download --resume --output-dir /data/maps
+    """
+    try:
+
+        def progress_callback(progress: DownloadProgress) -> None:
+            """Update progress display."""
+            total = progress.total
+            done = progress.completed + progress.failed + progress.skipped
+            click.echo(
+                f"\rProgress: {done}/{total} "
+                f"(completed: {progress.completed}, "
+                f"failed: {progress.failed}, "
+                f"skipped: {progress.skipped})",
+                nl=False,
+            )
+
+        downloader = BulkDownloader(
+            output_dir=output_dir,
+            concurrency=concurrency,
+            progress_callback=progress_callback,
+        )
+
+        click.echo(f"Output directory: {output_dir}")
+        click.echo(f"Concurrency: {concurrency}")
+        if limit:
+            click.echo(f"Limit: {limit}")
+        click.echo()
+
+        if from_file:
+            click.echo(f"Reading URLs from: {from_file}")
+            progress = downloader.download_from_file(from_file, limit=limit, resume=resume)
+        else:
+            click.echo("Using built-in seed URL list")
+            click.echo("(Use --from-file to specify custom URLs)")
+            try:
+                progress = downloader.download_from_seed_file(limit=limit, resume=resume)
+            except FileNotFoundError:
+                print_error("Seed URL file not found. Use --from-file to specify URLs.")
+                sys.exit(EXIT_USER_ERROR)
+
+        click.echo()
+        click.echo()
+        print_success("Download complete!")
+        click.echo(f"  Total: {progress.total}")
+        click.echo(f"  Completed: {progress.completed}")
+        click.echo(f"  Failed: {progress.failed}")
+        click.echo(f"  Skipped: {progress.skipped}")
+
+        if progress.failed > 0:
+            click.echo(f"\nSee {output_dir}/failures.json for details on failed downloads.")
+
+    except FileNotFoundError as e:
+        print_error(str(e))
         sys.exit(EXIT_USER_ERROR)
     except Exception as e:
         print_error(f"Unexpected error: {e}")
