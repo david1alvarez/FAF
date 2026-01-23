@@ -17,6 +17,8 @@ from faf.parser.scmap import (
     SCMapData,
     SCMapParseError,
     SCMapParser,
+    StratumLayer,
+    WaterConfig,
 )
 
 # Path to test fixture
@@ -194,3 +196,163 @@ class TestSCMapData:
 
         assert isinstance(data.heightmap, np.ndarray)
         assert len(data.heightmap.shape) == 2
+
+
+class TestSCMapParserWaterConfig:
+    """Tests for water configuration extraction."""
+
+    def test_parse_extracts_water_config(self) -> None:
+        """Parser should extract water configuration."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        assert result.water is not None
+        assert isinstance(result.water, WaterConfig)
+
+    def test_parse_water_config_has_water(self) -> None:
+        """Water config should have has_water field."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        assert result.water is not None
+        assert isinstance(result.water.has_water, bool)
+
+    def test_parse_water_config_elevation_matches_legacy(self) -> None:
+        """Water elevation in config should match legacy field."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        assert result.water is not None
+        assert result.water.elevation == result.water_elevation
+
+    def test_parse_water_config_has_all_elevations(self) -> None:
+        """Water config should have all elevation fields."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        assert result.water is not None
+        assert hasattr(result.water, "elevation")
+        assert hasattr(result.water, "elevation_deep")
+        assert hasattr(result.water, "elevation_abyss")
+
+
+class TestSCMapParserStrata:
+    """Tests for stratum layer extraction."""
+
+    def test_parse_extracts_strata(self) -> None:
+        """Parser should extract stratum layers."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        assert isinstance(result.strata, list)
+        assert len(result.strata) > 0
+
+    def test_parse_strata_are_stratum_layers(self) -> None:
+        """Each stratum should be a StratumLayer instance."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        for stratum in result.strata:
+            assert isinstance(stratum, StratumLayer)
+
+    def test_parse_stratum_has_texture_path(self) -> None:
+        """Each stratum should have a texture path."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        for stratum in result.strata:
+            assert stratum.texture_path
+            assert isinstance(stratum.texture_path, str)
+
+    def test_parse_stratum_has_texture_scale(self) -> None:
+        """Each stratum should have a texture scale."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        for stratum in result.strata:
+            assert isinstance(stratum.texture_scale, float)
+
+    def test_parse_strata_texture_paths_in_legacy_list(self) -> None:
+        """Stratum texture paths should appear in legacy texture_paths list."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        for stratum in result.strata:
+            assert stratum.texture_path in result.texture_paths
+
+
+class TestSCMapParserTerrainType:
+    """Tests for terrain type inference."""
+
+    def test_parse_extracts_terrain_type(self) -> None:
+        """Parser should extract terrain type."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        assert hasattr(result, "terrain_type")
+        assert isinstance(result.terrain_type, str)
+
+    def test_parse_terrain_type_is_valid(self) -> None:
+        """Terrain type should be a known type or 'unknown'."""
+        from faf.parser.terrain_types import get_all_terrain_types
+
+        result = SCMapParser.parse(FIXTURE_PATH)
+        valid_types = get_all_terrain_types() + ["unknown"]
+
+        assert result.terrain_type in valid_types
+
+
+class TestSCMapDataMapSize:
+    """Tests for map_size_km property."""
+
+    def test_map_size_km_5km(self) -> None:
+        """5km map (256 units) should return 5."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        # 256 / 51.2 = 5
+        assert result.map_size_km == 5
+
+    def test_map_size_km_is_integer(self) -> None:
+        """map_size_km should return an integer."""
+        result = SCMapParser.parse(FIXTURE_PATH)
+
+        assert isinstance(result.map_size_km, int)
+
+
+class TestWaterConfig:
+    """Tests for WaterConfig dataclass."""
+
+    def test_water_config_fields(self) -> None:
+        """WaterConfig should have all expected fields."""
+        config = WaterConfig(
+            has_water=True,
+            elevation=25.0,
+            elevation_deep=20.0,
+            elevation_abyss=10.0,
+        )
+
+        assert config.has_water is True
+        assert config.elevation == 25.0
+        assert config.elevation_deep == 20.0
+        assert config.elevation_abyss == 10.0
+
+
+class TestStratumLayer:
+    """Tests for StratumLayer dataclass."""
+
+    def test_stratum_layer_fields(self) -> None:
+        """StratumLayer should have all expected fields."""
+        layer = StratumLayer(
+            texture_path="/textures/grass.dds",
+            texture_scale=4.0,
+            normal_path="/textures/grass_normal.dds",
+            normal_scale=4.0,
+            mask=None,
+        )
+
+        assert layer.texture_path == "/textures/grass.dds"
+        assert layer.texture_scale == 4.0
+        assert layer.normal_path == "/textures/grass_normal.dds"
+        assert layer.normal_scale == 4.0
+        assert layer.mask is None
+
+    def test_stratum_layer_defaults(self) -> None:
+        """StratumLayer should have sensible defaults."""
+        layer = StratumLayer(
+            texture_path="/textures/grass.dds",
+            texture_scale=4.0,
+        )
+
+        assert layer.normal_path == ""
+        assert layer.normal_scale == 0.0
+        assert layer.mask is None

@@ -5,11 +5,13 @@ the map format used by Supreme Commander: Forged Alliance and FAForever.
 """
 
 import struct
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import BinaryIO, Union
+from typing import BinaryIO, Optional, Union
 
 import numpy as np
+
+from faf.parser.terrain_types import infer_terrain_type
 
 # SCMap format constants (from Neroxis Map Generator)
 SCMAP_SIGNATURE = 443572557
@@ -26,6 +28,43 @@ DDS_HEADER_SIZE = 128
 
 
 @dataclass
+class WaterConfig:
+    """Water configuration for an SCMap.
+
+    Attributes:
+        has_water: Whether the map has water enabled.
+        elevation: Water surface elevation level.
+        elevation_deep: Deep water elevation level.
+        elevation_abyss: Abyss (deepest) water elevation level.
+    """
+
+    has_water: bool
+    elevation: float
+    elevation_deep: float
+    elevation_abyss: float
+
+
+@dataclass
+class StratumLayer:
+    """A stratum (texture) layer in an SCMap.
+
+    Attributes:
+        texture_path: Path to the albedo texture file.
+        texture_scale: Scale factor for the texture.
+        normal_path: Path to the normal map texture file.
+        normal_scale: Scale factor for the normal map.
+        mask: 2D numpy array of mask values (uint8), or None if not extracted.
+              Shape is (heightmap_height/2, heightmap_width/2).
+    """
+
+    texture_path: str
+    texture_scale: float
+    normal_path: str = ""
+    normal_scale: float = 0.0
+    mask: Optional[np.ndarray] = None
+
+
+@dataclass
 class SCMapData:
     """Container for parsed SCMap data.
 
@@ -35,8 +74,11 @@ class SCMapData:
         height: Map height in game units.
         heightmap: 2D numpy array of height values (uint16).
         heightmap_scale: Scale factor for heightmap values.
-        water_elevation: Water surface elevation level.
-        texture_paths: List of stratum texture file paths.
+        water_elevation: Water surface elevation level (legacy, use water.elevation).
+        texture_paths: List of stratum texture file paths (legacy, use strata).
+        water: Water configuration, or None if parsing failed.
+        strata: List of stratum layers with texture paths and masks.
+        terrain_type: Inferred terrain type from texture paths.
     """
 
     version: int
@@ -46,6 +88,18 @@ class SCMapData:
     heightmap_scale: float
     water_elevation: float
     texture_paths: list[str]
+    # Extended fields
+    water: Optional[WaterConfig] = None
+    strata: list[StratumLayer] = field(default_factory=list)
+    terrain_type: str = "unknown"
+
+    @property
+    def map_size_km(self) -> int:
+        """Return map size in km (5, 10, 20, etc.).
+
+        The map width in game units divided by 51.2 gives the size in km.
+        """
+        return int(self.width / 51.2)
 
 
 class SCMapParseError(Exception):
@@ -177,10 +231,17 @@ class SCMapParser:
             f.seek(52, 1)
 
             # Read water settings
-            cls._read_byte(f)  # water_present
+            water_present = cls._read_byte(f) != 0
             water_elevation = cls._read_float(f)
-            cls._read_float(f)  # water_elevation_deep
-            cls._read_float(f)  # water_elevation_abyss
+            water_elevation_deep = cls._read_float(f)
+            water_elevation_abyss = cls._read_float(f)
+
+            water_config = WaterConfig(
+                has_water=water_present,
+                elevation=water_elevation,
+                elevation_deep=water_elevation_deep,
+                elevation_abyss=water_elevation_abyss,
+            )
 
             # Skip rest of water settings (surface color, color lerp, refraction,
             # fresnel bias/power, unit reflection, sky reflection, sun shininess,
@@ -231,31 +292,55 @@ class SCMapParser:
             if version >= 60:
                 f.seek(4, 1)  # Unknown value
 
-            # Read terrain materials (texture paths)
-            texture_paths = []
-
-            # There are typically 10 stratum layers (9 terrain + 1 upper)
-            # Each has: path (string) + scale (float) + normal path (string) + scale (float)
-            # But we'll read what we can and handle variations
-
-            # The terrain materials section has:
-            # - TERRAIN_TEXTURE_COUNT texture entries (each: path string + float scale)
-            # - TERRAIN_NORMAL_COUNT normal entries (each: path string + float scale)
-            # TERRAIN_TEXTURE_COUNT and TERRAIN_NORMAL_COUNT are typically 10 each
-
+            # Read terrain materials (texture paths and scales)
+            # There are 10 stratum layers total
             terrain_texture_count = 10
+            terrain_normal_count = 9
+
+            # Read albedo textures and scales
+            stratum_textures: list[tuple[str, float]] = []
             for _ in range(terrain_texture_count):
                 tex_path = cls._read_string_null(f)
-                cls._read_float(f)  # tex_scale
-                if tex_path:
-                    texture_paths.append(tex_path)
+                tex_scale = cls._read_float(f)
+                stratum_textures.append((tex_path, tex_scale))
 
-            terrain_normal_count = 9
+            # Read normal maps and scales
+            stratum_normals: list[tuple[str, float]] = []
             for _ in range(terrain_normal_count):
                 normal_path = cls._read_string_null(f)
-                cls._read_float(f)  # normal_scale
+                normal_scale = cls._read_float(f)
+                stratum_normals.append((normal_path, normal_scale))
+
+            # Build strata list
+            strata: list[StratumLayer] = []
+            for i, (tex_path, tex_scale) in enumerate(stratum_textures):
+                if tex_path:  # Only include layers with actual textures
+                    normal_path = ""
+                    normal_scale = 0.0
+                    if i < len(stratum_normals):
+                        normal_path, normal_scale = stratum_normals[i]
+
+                    strata.append(
+                        StratumLayer(
+                            texture_path=tex_path,
+                            texture_scale=tex_scale,
+                            normal_path=normal_path,
+                            normal_scale=normal_scale,
+                            mask=None,  # Masks are parsed separately if needed
+                        )
+                    )
+
+            # Build legacy texture_paths list for backward compatibility
+            texture_paths: list[str] = []
+            for tex_path, _ in stratum_textures:
+                if tex_path:
+                    texture_paths.append(tex_path)
+            for normal_path, _ in stratum_normals:
                 if normal_path:
                     texture_paths.append(normal_path)
+
+            # Infer terrain type from texture paths
+            terrain_type = infer_terrain_type(texture_paths)
 
             return SCMapData(
                 version=version,
@@ -265,6 +350,9 @@ class SCMapParser:
                 heightmap_scale=heightmap_scale,
                 water_elevation=water_elevation,
                 texture_paths=texture_paths,
+                water=water_config,
+                strata=strata,
+                terrain_type=terrain_type,
             )
 
         except struct.error as e:
