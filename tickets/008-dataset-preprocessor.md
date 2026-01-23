@@ -1,7 +1,17 @@
 # TICKET-008: Dataset Preprocessor
 
 ## Status
-NOT STARTED
+PENDING REVIEW
+
+## Claude Code Working Area
+- [x] Read ticket and understand requirements
+- [x] Create preprocessing module structure
+- [x] Implement normalize.py with heightmap normalization
+- [x] Implement dataset.py with DatasetBuilder class
+- [x] Add preprocess CLI command to main.py
+- [x] Add unit tests for normalization and split logic (64 new tests, 192 total)
+- [x] Run black and ruff checks
+- [x] Self-review and update status
 
 ## Priority
 P0-Critical
@@ -10,17 +20,17 @@ P0-Critical
 Implement a preprocessing pipeline that transforms downloaded FAF maps into an ML-ready dataset. The preprocessor extracts heightmaps, normalizes them, collects metadata, and creates train/val/test splits.
 
 ## Acceptance Criteria
-- [ ] `src/python/faf/preprocessing/dataset.py` exists with `DatasetBuilder` class
-- [ ] Extracts heightmaps as normalized float32 numpy arrays
-- [ ] Saves heightmaps to `heightmaps/` directory as `.npy` files
-- [ ] Generates `metadata.json` with map info for each sample
-- [ ] Generates `splits.json` with reproducible train/val/test assignments
-- [ ] CLI command: `faf preprocess INPUT_DIR --output OUTPUT_DIR`
-- [ ] Handles corrupted/unparseable maps gracefully (log and skip)
-- [ ] Supports filtering by map size during preprocessing
-- [ ] Progress bar showing preprocessing status
-- [ ] Unit tests for normalization and split logic
-- [ ] Code passes `black` and `ruff` checks
+- [x] `src/python/faf/preprocessing/dataset.py` exists with `DatasetBuilder` class
+- [x] Extracts heightmaps as normalized float32 numpy arrays
+- [x] Saves heightmaps to `heightmaps/` directory as `.npy` files
+- [x] Generates `metadata.json` with map info for each sample
+- [x] Generates `splits.json` with reproducible train/val/test assignments
+- [x] CLI command: `faf preprocess INPUT_DIR --output OUTPUT_DIR`
+- [x] Handles corrupted/unparseable maps gracefully (log and skip)
+- [x] Supports filtering by map size during preprocessing
+- [x] Progress bar showing preprocessing status
+- [x] Unit tests for normalization and split logic (23 dataset + 17 normalize + 13 CLI + 11 misc = 64 new tests)
+- [x] Code passes `black` and `ruff` checks
 
 ## Technical Context
 

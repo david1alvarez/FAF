@@ -541,3 +541,299 @@ class TestBulkDownloadCommand:
             assert "Output directory:" in result.output
             assert "Concurrency: 4" in result.output
             assert "Limit: 5" in result.output
+
+
+class TestPreprocessCommand:
+    """Tests for the preprocess CLI command."""
+
+    def test_preprocess_help(self, runner: CliRunner) -> None:
+        """Should display help text for preprocess command."""
+        result = runner.invoke(cli, ["preprocess", "--help"])
+
+        assert result.exit_code == EXIT_SUCCESS
+        assert "Preprocess downloaded maps" in result.output
+        assert "--output" in result.output
+        assert "--min-size" in result.output
+        assert "--split" in result.output
+        assert "--seed" in result.output
+
+    def test_preprocess_requires_input_dir(self, runner: CliRunner) -> None:
+        """Should require input directory argument."""
+        result = runner.invoke(cli, ["preprocess", "--output", "/tmp/out"])
+
+        assert result.exit_code != EXIT_SUCCESS
+        assert "Missing argument" in result.output
+
+    def test_preprocess_requires_output_option(self, runner: CliRunner) -> None:
+        """Should require --output option."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = runner.invoke(cli, ["preprocess", tmpdir])
+
+        assert result.exit_code != EXIT_SUCCESS
+        assert "Missing option" in result.output or "--output" in result.output
+
+    def test_preprocess_with_mocked_builder(self, runner: CliRunner) -> None:
+        """Should call DatasetBuilder with correct parameters."""
+        with mock.patch("faf.cli.main.DatasetBuilder") as MockBuilder:
+            mock_instance = MockBuilder.return_value
+            mock_instance.build.return_value = mock.MagicMock(
+                output_dir=Path("/tmp/out"),
+                total_samples=10,
+                processed=10,
+                failed=0,
+                skipped=0,
+                split_counts={"train": 8, "val": 1, "test": 1},
+            )
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                input_dir = Path(tmpdir) / "input"
+                input_dir.mkdir()
+                output_dir = Path(tmpdir) / "output"
+
+                result = runner.invoke(
+                    cli,
+                    ["preprocess", str(input_dir), "--output", str(output_dir)],
+                )
+
+            assert result.exit_code == EXIT_SUCCESS
+            MockBuilder.assert_called_once()
+            mock_instance.build.assert_called_once()
+
+    def test_preprocess_with_size_filters(self, runner: CliRunner) -> None:
+        """Should pass size filters to DatasetBuilder."""
+        with mock.patch("faf.cli.main.DatasetBuilder") as MockBuilder:
+            mock_instance = MockBuilder.return_value
+            mock_instance.build.return_value = mock.MagicMock(
+                output_dir=Path("/tmp/out"),
+                total_samples=5,
+                processed=5,
+                failed=0,
+                skipped=0,
+                split_counts={"train": 4, "val": 0, "test": 1},
+            )
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                input_dir = Path(tmpdir) / "input"
+                input_dir.mkdir()
+                output_dir = Path(tmpdir) / "output"
+
+                result = runner.invoke(
+                    cli,
+                    [
+                        "preprocess",
+                        str(input_dir),
+                        "--output",
+                        str(output_dir),
+                        "--min-size",
+                        "256",
+                        "--max-size",
+                        "1024",
+                    ],
+                )
+
+            assert result.exit_code == EXIT_SUCCESS
+            call_kwargs = MockBuilder.call_args[1]
+            assert call_kwargs["min_size"] == 256
+            assert call_kwargs["max_size"] == 1024
+
+    def test_preprocess_with_custom_split(self, runner: CliRunner) -> None:
+        """Should parse custom split ratios."""
+        with mock.patch("faf.cli.main.DatasetBuilder") as MockBuilder:
+            mock_instance = MockBuilder.return_value
+            mock_instance.build.return_value = mock.MagicMock(
+                output_dir=Path("/tmp/out"),
+                total_samples=10,
+                processed=10,
+                failed=0,
+                skipped=0,
+                split_counts={"train": 7, "val": 2, "test": 1},
+            )
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                input_dir = Path(tmpdir) / "input"
+                input_dir.mkdir()
+                output_dir = Path(tmpdir) / "output"
+
+                result = runner.invoke(
+                    cli,
+                    [
+                        "preprocess",
+                        str(input_dir),
+                        "--output",
+                        str(output_dir),
+                        "--split",
+                        "0.7,0.2,0.1",
+                    ],
+                )
+
+            assert result.exit_code == EXIT_SUCCESS
+            call_kwargs = MockBuilder.call_args[1]
+            assert call_kwargs["split_ratios"]["train"] == 0.7
+            assert call_kwargs["split_ratios"]["val"] == 0.2
+            assert call_kwargs["split_ratios"]["test"] == 0.1
+
+    def test_preprocess_with_seed(self, runner: CliRunner) -> None:
+        """Should pass seed to DatasetBuilder."""
+        with mock.patch("faf.cli.main.DatasetBuilder") as MockBuilder:
+            mock_instance = MockBuilder.return_value
+            mock_instance.build.return_value = mock.MagicMock(
+                output_dir=Path("/tmp/out"),
+                total_samples=5,
+                processed=5,
+                failed=0,
+                skipped=0,
+                split_counts={"train": 4, "val": 1, "test": 0},
+            )
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                input_dir = Path(tmpdir) / "input"
+                input_dir.mkdir()
+                output_dir = Path(tmpdir) / "output"
+
+                result = runner.invoke(
+                    cli,
+                    [
+                        "preprocess",
+                        str(input_dir),
+                        "--output",
+                        str(output_dir),
+                        "--seed",
+                        "123",
+                    ],
+                )
+
+            assert result.exit_code == EXIT_SUCCESS
+            call_kwargs = MockBuilder.call_args[1]
+            assert call_kwargs["seed"] == 123
+
+    def test_preprocess_displays_settings(self, runner: CliRunner) -> None:
+        """Should display preprocessing settings at start."""
+        with mock.patch("faf.cli.main.DatasetBuilder") as MockBuilder:
+            mock_instance = MockBuilder.return_value
+            mock_instance.build.return_value = mock.MagicMock(
+                output_dir=Path("/tmp/out"),
+                total_samples=5,
+                processed=5,
+                failed=0,
+                skipped=0,
+                split_counts={"train": 4, "val": 1, "test": 0},
+            )
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                input_dir = Path(tmpdir) / "input"
+                input_dir.mkdir()
+                output_dir = Path(tmpdir) / "output"
+
+                result = runner.invoke(
+                    cli,
+                    [
+                        "preprocess",
+                        str(input_dir),
+                        "--output",
+                        str(output_dir),
+                        "--seed",
+                        "42",
+                    ],
+                )
+
+            assert result.exit_code == EXIT_SUCCESS
+            assert "Input directory:" in result.output
+            assert "Output directory:" in result.output
+            assert "Random seed: 42" in result.output
+
+    def test_preprocess_displays_summary(self, runner: CliRunner) -> None:
+        """Should display preprocessing summary at end."""
+        with mock.patch("faf.cli.main.DatasetBuilder") as MockBuilder:
+            mock_instance = MockBuilder.return_value
+            mock_instance.build.return_value = mock.MagicMock(
+                output_dir=Path("/tmp/out"),
+                total_samples=10,
+                processed=8,
+                failed=1,
+                skipped=1,
+                split_counts={"train": 6, "val": 1, "test": 1},
+            )
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                input_dir = Path(tmpdir) / "input"
+                input_dir.mkdir()
+                output_dir = Path(tmpdir) / "output"
+
+                result = runner.invoke(
+                    cli,
+                    ["preprocess", str(input_dir), "--output", str(output_dir)],
+                )
+
+            assert result.exit_code == EXIT_SUCCESS
+            assert "Preprocessing complete!" in result.output
+            assert "Total samples: 10" in result.output
+            assert "Processed: 8" in result.output
+            assert "Failed: 1" in result.output
+            assert "Train: 6" in result.output
+            assert "Val: 1" in result.output
+            assert "Test: 1" in result.output
+
+    def test_preprocess_shows_errors_hint_on_failures(self, runner: CliRunner) -> None:
+        """Should show hint about errors.json when there are failures."""
+        with mock.patch("faf.cli.main.DatasetBuilder") as MockBuilder:
+            mock_instance = MockBuilder.return_value
+            mock_instance.build.return_value = mock.MagicMock(
+                output_dir=Path("/tmp/out"),
+                total_samples=9,
+                processed=8,
+                failed=2,
+                skipped=0,
+                split_counts={"train": 7, "val": 1, "test": 0},
+            )
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                input_dir = Path(tmpdir) / "input"
+                input_dir.mkdir()
+                output_dir = Path(tmpdir) / "output"
+
+                result = runner.invoke(
+                    cli,
+                    ["preprocess", str(input_dir), "--output", str(output_dir)],
+                )
+
+            assert result.exit_code == EXIT_SUCCESS
+            assert "errors.json" in result.output
+
+    def test_preprocess_invalid_split_format(self, runner: CliRunner) -> None:
+        """Should exit with error for invalid split format."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            input_dir = Path(tmpdir) / "input"
+            input_dir.mkdir()
+            output_dir = Path(tmpdir) / "output"
+
+            result = runner.invoke(
+                cli,
+                [
+                    "preprocess",
+                    str(input_dir),
+                    "--output",
+                    str(output_dir),
+                    "--split",
+                    "0.8,0.2",  # Missing third value
+                ],
+            )
+
+        assert result.exit_code == EXIT_USER_ERROR
+        assert "Error:" in result.output
+        assert "Invalid split format" in result.output
+
+    def test_preprocess_nonexistent_input_dir(self, runner: CliRunner) -> None:
+        """Should exit with error for nonexistent input directory."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = runner.invoke(
+                cli,
+                [
+                    "preprocess",
+                    "/nonexistent/input/path",
+                    "--output",
+                    tmpdir,
+                ],
+            )
+
+        # Click validates exists=True before we get to our code
+        assert result.exit_code != EXIT_SUCCESS
