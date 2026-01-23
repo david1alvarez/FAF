@@ -4,11 +4,16 @@ This module provides a client for querying the FAF (Forged Alliance Forever) API
 to discover and list maps available in the vault.
 """
 
+from __future__ import annotations
+
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 import requests
+
+if TYPE_CHECKING:
+    from faf.api.auth import FAFAuthClient
 
 # FAF API base URL
 FAF_API_BASE_URL = "https://api.faforever.com"
@@ -107,14 +112,19 @@ class FAFApiClient:
     """Client for the FAF API map discovery endpoints.
 
     This client handles pagination, rate limiting, and error handling for
-    querying the FAF map vault.
+    querying the FAF map vault. Supports optional OAuth2 authentication.
 
     Example:
+        >>> # Without authentication (may get 403 on some endpoints)
         >>> client = FAFApiClient()
         >>> result = client.list_maps(page_size=10, page=1)
+
+        >>> # With authentication
+        >>> from faf.api.auth import FAFAuthClient
+        >>> auth = FAFAuthClient.from_environment()
+        >>> client = FAFApiClient(auth_client=auth)
+        >>> result = client.list_maps(page_size=10, page=1)
         >>> print(f"Total maps: {result.total_records}")
-        >>> for m in result.maps:
-        ...     print(f"  {m.display_name} ({m.player_count}p)")
     """
 
     def __init__(
@@ -124,6 +134,7 @@ class FAFApiClient:
         max_retries: int = DEFAULT_MAX_RETRIES,
         initial_backoff: float = DEFAULT_INITIAL_BACKOFF,
         timeout: int = DEFAULT_TIMEOUT,
+        auth_client: Optional[FAFAuthClient] = None,
     ) -> None:
         """Initialize the FAF API client.
 
@@ -133,13 +144,27 @@ class FAFApiClient:
             max_retries: Maximum number of retry attempts for transient failures.
             initial_backoff: Initial backoff delay in seconds for retries.
             timeout: HTTP request timeout in seconds.
+            auth_client: Optional FAFAuthClient for authenticated requests.
         """
         self.base_url = base_url.rstrip("/")
         self.min_request_delay = min_request_delay
         self.max_retries = max_retries
         self.initial_backoff = initial_backoff
         self.timeout = timeout
+        self.auth_client = auth_client
         self._last_request_time: Optional[float] = None
+
+    def _get_headers(self) -> dict[str, str]:
+        """Get headers for API requests, including auth if available.
+
+        Returns:
+            Dictionary of HTTP headers.
+        """
+        headers = {**DEFAULT_HEADERS}
+        if self.auth_client:
+            token = self.auth_client.get_valid_token()
+            headers["Authorization"] = token.authorization_header
+        return headers
 
     def list_maps(
         self,
@@ -243,7 +268,7 @@ class FAFApiClient:
         for attempt in range(self.max_retries):
             try:
                 response = requests.get(
-                    url, params=params, headers=DEFAULT_HEADERS, timeout=self.timeout
+                    url, params=params, headers=self._get_headers(), timeout=self.timeout
                 )
                 self._last_request_time = time.time()
 

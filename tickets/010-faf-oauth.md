@@ -1,7 +1,18 @@
 # TICKET-010: FAF OAuth Implementation
 
 ## Status
-NOT STARTED
+TESTING AND REVISIONS
+
+## Claude Code Working Area
+- [x] Read ticket and understand requirements
+- [x] Implement auth.py with FAFAuthClient class
+- [x] Update FAFApiClient to support authentication
+- [x] Add unit tests with mocked OAuth responses (29 tests)
+- [x] Add CLI flags for credentials (--auth-config, env vars, --no-auth)
+- [x] Run black and ruff checks
+- [ ] Integration tests (pending credentials)
+- [ ] Remove seed file fallback (pending credentials verification - see TODO-012)
+- [ ] Self-review and update status
 
 ## Priority
 P2-Medium
@@ -10,18 +21,18 @@ P2-Medium
 Implement OAuth2 authentication for the FAF API to enable dynamic map discovery. The FAF API now requires authentication (see TODO-002), blocking programmatic access to map listings. This ticket restores full API functionality and removes the need for the static URL fallback in TICKET-006.
 
 ## Acceptance Criteria
-- [ ] `src/python/faf/api/auth.py` exists with `FAFAuthClient` class
-- [ ] Supports OAuth2 client credentials flow
-- [ ] Securely stores/retrieves tokens (environment variables or config file)
-- [ ] Automatically refreshes expired tokens
-- [ ] `FAFApiClient` updated to use authentication when credentials available
-- [ ] CLI commands support `--auth-config` flag for credentials file
+- [x] `src/python/faf/api/auth.py` exists with `FAFAuthClient` class
+- [x] Supports OAuth2 client credentials flow
+- [x] Securely stores/retrieves tokens (environment variables or config file)
+- [x] Automatically refreshes expired tokens
+- [x] `FAFApiClient` updated to use authentication when credentials available
+- [x] CLI commands support `--auth-config` flag for credentials file
 - [ ] Documentation for obtaining FAF API credentials
-- [ ] **Remove `data/seed_map_urls.txt` static fallback from TICKET-006**
-- [ ] **Update `bulk-download` command to use API by default**
-- [ ] Integration tests pass with authenticated requests
-- [ ] Unit tests with mocked OAuth responses
-- [ ] Code passes `black` and `ruff` checks
+- [ ] **Remove `data/seed_map_urls.txt` static fallback from TICKET-006** (TODO-012)
+- [ ] **Update `bulk-download` command to use API by default** (TODO-012)
+- [ ] Integration tests pass with authenticated requests (pending credentials)
+- [x] Unit tests with mocked OAuth responses
+- [x] Code passes `black` and `ruff` checks
 
 ## Technical Context
 
@@ -210,4 +221,19 @@ Before implementation, investigate:
 - Python requests-oauthlib: https://requests-oauthlib.readthedocs.io/
 
 ## Claude Code Working Area
-[Space for implementation notes]
+### Implementation Notes
+**Completed:**
+- `FAFAuthClient` class with OAuth2 client credentials flow
+- Token caching with 5-minute expiry buffer for automatic refresh
+- Three credential sources: config file, environment variables, direct credentials
+- Helper functions: `get_credentials_from_environment()`, `has_credentials_in_environment()`
+- `FAFApiClient` integration via optional `auth_client` parameter
+- CLI flags: `--auth-config`, `--no-auth` for bulk-download command
+- 29 unit tests for auth module (all passing)
+- All 261 tests pass, black and ruff checks pass
+
+**Pending (requires credentials):**
+- Integration tests with real FAF API
+- Switch bulk-download from seed file to API (TODO-012)
+- Remove seed file fallback after verification
+- Documentation for obtaining FAF API credentials
