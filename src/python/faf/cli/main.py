@@ -14,7 +14,7 @@ import numpy as np
 from faf.downloader import BulkDownloader, DownloadProgress, MapDownloader, MapDownloadError
 from faf.parser import SCMapParser
 from faf.parser.scmap import SCMapParseError
-from faf.preprocessing import DatasetBuilder
+from faf.preprocessing import DatasetBuilder, DatasetStats, DatasetValidator
 from faf.preprocessing.dataset import BuildProgress
 
 # Exit codes
@@ -510,6 +510,133 @@ def preprocess(
 
         if result.failed > 0:
             click.echo(f"\nSee {output_dir}/errors.json for details on failed maps.")
+
+    except FileNotFoundError as e:
+        print_error(str(e))
+        sys.exit(EXIT_USER_ERROR)
+    except ValueError as e:
+        print_error(str(e))
+        sys.exit(EXIT_USER_ERROR)
+    except Exception as e:
+        print_error(f"Unexpected error: {e}")
+        sys.exit(EXIT_SYSTEM_ERROR)
+
+
+@cli.command("dataset-validate")
+@click.argument("dataset_path", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    default=False,
+    help="Output results as JSON",
+)
+def dataset_validate(dataset_path: Path, output_json: bool) -> None:
+    """Validate a preprocessed dataset.
+
+    Checks that all heightmaps are valid, values are in range,
+    and train/val/test splits are properly constructed.
+
+    DATASET_PATH is the path to a dataset created by 'faf preprocess'.
+
+    Exit code is 0 if valid, 1 if errors found.
+
+    Examples:
+
+        # Validate and show human-readable output
+        faf dataset-validate /data/dataset
+
+        # Output validation report as JSON
+        faf dataset-validate /data/dataset --json > report.json
+    """
+    try:
+        validator = DatasetValidator(dataset_path)
+        report = validator.validate()
+
+        if output_json:
+            click.echo(report.to_json())
+        else:
+            if report.valid:
+                print_success(f"Dataset is valid: {dataset_path}")
+                click.echo(f"  Total samples: {report.total_samples}")
+                click.echo(f"  Valid samples: {report.valid_samples}")
+            else:
+                print_error(f"Dataset has errors: {dataset_path}")
+                click.echo(f"  Total samples: {report.total_samples}")
+                click.echo(f"  Valid samples: {report.valid_samples}")
+                click.echo(f"  Invalid samples: {report.invalid_samples}")
+
+                if report.metadata_errors:
+                    click.echo("\nMetadata errors:")
+                    for err in report.metadata_errors:
+                        click.echo(f"  - {err}")
+
+                if report.split_errors:
+                    click.echo("\nSplit errors:")
+                    for err in report.split_errors:
+                        click.echo(f"  - {err}")
+
+                if report.sample_errors:
+                    click.echo(f"\nSample errors ({len(report.sample_errors)} samples):")
+                    for sample_err in report.sample_errors[:10]:  # Show first 10
+                        click.echo(f"  {sample_err.sample_id}:")
+                        for err in sample_err.errors:
+                            click.echo(f"    - {err}")
+                    if len(report.sample_errors) > 10:
+                        click.echo(f"  ... and {len(report.sample_errors) - 10} more")
+
+        sys.exit(EXIT_SUCCESS if report.valid else EXIT_USER_ERROR)
+
+    except FileNotFoundError as e:
+        print_error(str(e))
+        sys.exit(EXIT_USER_ERROR)
+    except Exception as e:
+        print_error(f"Unexpected error: {e}")
+        sys.exit(EXIT_SYSTEM_ERROR)
+
+
+@cli.command("dataset-info")
+@click.argument("dataset_path", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--json",
+    "output_json",
+    is_flag=True,
+    default=False,
+    help="Output results as JSON",
+)
+@click.option(
+    "--no-heightmap-stats",
+    is_flag=True,
+    default=False,
+    help="Skip heightmap statistics (faster for large datasets)",
+)
+def dataset_info(dataset_path: Path, output_json: bool, no_heightmap_stats: bool) -> None:
+    """Show statistics for a preprocessed dataset.
+
+    Displays information about map sizes, terrain types, water coverage,
+    and heightmap value distributions.
+
+    DATASET_PATH is the path to a dataset created by 'faf preprocess'.
+
+    Examples:
+
+        # Show human-readable statistics
+        faf dataset-info /data/dataset
+
+        # Output statistics as JSON
+        faf dataset-info /data/dataset --json > stats.json
+
+        # Skip heightmap stats for faster output
+        faf dataset-info /data/dataset --no-heightmap-stats
+    """
+    try:
+        stats = DatasetStats(dataset_path, compute_heightmap_stats=not no_heightmap_stats)
+        result = stats.compute()
+
+        if output_json:
+            click.echo(result.to_json())
+        else:
+            click.echo(result.format_human_readable())
 
     except FileNotFoundError as e:
         print_error(str(e))

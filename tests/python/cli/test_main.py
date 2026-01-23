@@ -837,3 +837,130 @@ class TestPreprocessCommand:
 
         # Click validates exists=True before we get to our code
         assert result.exit_code != EXIT_SUCCESS
+
+
+class TestDatasetValidateCommand:
+    """Tests for the dataset-validate CLI command."""
+
+    def test_dataset_validate_help(self, runner: CliRunner) -> None:
+        """Should display help text for dataset-validate command."""
+        result = runner.invoke(cli, ["dataset-validate", "--help"])
+
+        assert result.exit_code == EXIT_SUCCESS
+        assert "Validate a preprocessed dataset" in result.output
+        assert "--json" in result.output
+
+    def test_dataset_validate_valid_dataset(self, runner: CliRunner) -> None:
+        """Should return success for valid dataset."""
+        with mock.patch("faf.cli.main.DatasetValidator") as MockValidator:
+            mock_report = mock.MagicMock()
+            mock_report.valid = True
+            mock_report.total_samples = 10
+            mock_report.valid_samples = 10
+            MockValidator.return_value.validate.return_value = mock_report
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = runner.invoke(cli, ["dataset-validate", tmpdir])
+
+            assert result.exit_code == EXIT_SUCCESS
+            assert "valid" in result.output.lower()
+
+    def test_dataset_validate_invalid_dataset(self, runner: CliRunner) -> None:
+        """Should return error code for invalid dataset."""
+        with mock.patch("faf.cli.main.DatasetValidator") as MockValidator:
+            mock_report = mock.MagicMock()
+            mock_report.valid = False
+            mock_report.total_samples = 10
+            mock_report.valid_samples = 8
+            mock_report.invalid_samples = 2
+            mock_report.metadata_errors = []
+            mock_report.split_errors = []
+            mock_report.sample_errors = []
+            MockValidator.return_value.validate.return_value = mock_report
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = runner.invoke(cli, ["dataset-validate", tmpdir])
+
+            assert result.exit_code == EXIT_USER_ERROR
+
+    def test_dataset_validate_json_output(self, runner: CliRunner) -> None:
+        """Should output JSON when --json flag is used."""
+        with mock.patch("faf.cli.main.DatasetValidator") as MockValidator:
+            mock_report = mock.MagicMock()
+            mock_report.valid = True
+            mock_report.to_json.return_value = '{"valid": true}'
+            MockValidator.return_value.validate.return_value = mock_report
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = runner.invoke(cli, ["dataset-validate", tmpdir, "--json"])
+
+            assert result.exit_code == EXIT_SUCCESS
+            assert '{"valid": true}' in result.output
+
+    def test_dataset_validate_nonexistent_path(self, runner: CliRunner) -> None:
+        """Should exit with error for nonexistent path."""
+        result = runner.invoke(cli, ["dataset-validate", "/nonexistent/path"])
+
+        # Click validates exists=True
+        assert result.exit_code != EXIT_SUCCESS
+
+
+class TestDatasetInfoCommand:
+    """Tests for the dataset-info CLI command."""
+
+    def test_dataset_info_help(self, runner: CliRunner) -> None:
+        """Should display help text for dataset-info command."""
+        result = runner.invoke(cli, ["dataset-info", "--help"])
+
+        assert result.exit_code == EXIT_SUCCESS
+        assert "Show statistics for a preprocessed dataset" in result.output
+        assert "--json" in result.output
+        assert "--no-heightmap-stats" in result.output
+
+    def test_dataset_info_human_readable(self, runner: CliRunner) -> None:
+        """Should display human-readable output by default."""
+        with mock.patch("faf.cli.main.DatasetStats") as MockStats:
+            mock_result = mock.MagicMock()
+            mock_result.format_human_readable.return_value = "Dataset Statistics: /test\n"
+            MockStats.return_value.compute.return_value = mock_result
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = runner.invoke(cli, ["dataset-info", tmpdir])
+
+            assert result.exit_code == EXIT_SUCCESS
+            assert "Dataset Statistics" in result.output
+
+    def test_dataset_info_json_output(self, runner: CliRunner) -> None:
+        """Should output JSON when --json flag is used."""
+        with mock.patch("faf.cli.main.DatasetStats") as MockStats:
+            mock_result = mock.MagicMock()
+            mock_result.to_json.return_value = '{"total_samples": 10}'
+            MockStats.return_value.compute.return_value = mock_result
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = runner.invoke(cli, ["dataset-info", tmpdir, "--json"])
+
+            assert result.exit_code == EXIT_SUCCESS
+            assert '{"total_samples": 10}' in result.output
+
+    def test_dataset_info_no_heightmap_stats(self, runner: CliRunner) -> None:
+        """Should pass compute_heightmap_stats=False when flag is used."""
+        with mock.patch("faf.cli.main.DatasetStats") as MockStats:
+            mock_result = mock.MagicMock()
+            mock_result.format_human_readable.return_value = "Stats"
+            MockStats.return_value.compute.return_value = mock_result
+
+            with tempfile.TemporaryDirectory() as tmpdir:
+                result = runner.invoke(cli, ["dataset-info", tmpdir, "--no-heightmap-stats"])
+
+            assert result.exit_code == EXIT_SUCCESS
+            # Check that DatasetStats was called with compute_heightmap_stats=False
+            call_kwargs = MockStats.call_args[1]
+            assert call_kwargs["compute_heightmap_stats"] is False
+
+    def test_dataset_info_nonexistent_path(self, runner: CliRunner) -> None:
+        """Should exit with error for nonexistent path."""
+        result = runner.invoke(cli, ["dataset-info", "/nonexistent/path"])
+
+        # Click validates exists=True
+        assert result.exit_code != EXIT_SUCCESS
