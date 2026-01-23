@@ -14,6 +14,8 @@ import numpy as np
 from faf.downloader import BulkDownloader, DownloadProgress, MapDownloader, MapDownloadError
 from faf.parser import SCMapParser
 from faf.parser.scmap import SCMapParseError
+from faf.preprocessing import DatasetBuilder
+from faf.preprocessing.dataset import BuildProgress
 
 # Exit codes
 EXIT_SUCCESS = 0
@@ -367,6 +369,152 @@ def bulk_download(
             click.echo(f"\nSee {output_dir}/failures.json for details on failed downloads.")
 
     except FileNotFoundError as e:
+        print_error(str(e))
+        sys.exit(EXIT_USER_ERROR)
+    except Exception as e:
+        print_error(f"Unexpected error: {e}")
+        sys.exit(EXIT_SYSTEM_ERROR)
+
+
+@cli.command()
+@click.argument("input_dir", type=click.Path(exists=True, path_type=Path))
+@click.option(
+    "--output",
+    "-o",
+    "output_dir",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Output directory for the dataset",
+)
+@click.option(
+    "--min-size",
+    type=int,
+    default=None,
+    help="Minimum map size in game units (e.g., 256 for 5km)",
+)
+@click.option(
+    "--max-size",
+    type=int,
+    default=None,
+    help="Maximum map size in game units (e.g., 1024 for 20km)",
+)
+@click.option(
+    "--split",
+    "split_str",
+    type=str,
+    default="0.8,0.1,0.1",
+    help="Train/val/test split ratios (default: 0.8,0.1,0.1)",
+)
+@click.option(
+    "--seed",
+    type=int,
+    default=42,
+    help="Random seed for reproducible splits (default: 42)",
+)
+def preprocess(
+    input_dir: Path,
+    output_dir: Path,
+    min_size: Optional[int],
+    max_size: Optional[int],
+    split_str: str,
+    seed: int,
+) -> None:
+    """Preprocess downloaded maps into an ML-ready dataset.
+
+    Extracts heightmaps from .scmap files, normalizes them to float32 [0,1],
+    and creates train/val/test splits.
+
+    INPUT_DIR is the directory containing downloaded map folders
+    (e.g., from 'faf bulk-download').
+
+    Examples:
+
+        # Basic preprocessing
+        faf preprocess /data/maps --output /data/dataset
+
+        # Filter by size (10km and larger maps only)
+        faf preprocess /data/maps --output /data/dataset --min-size 512
+
+        # Custom split ratios (70% train, 15% val, 15% test)
+        faf preprocess /data/maps --output /data/dataset --split 0.7,0.15,0.15
+
+        # Reproducible splits with specific seed
+        faf preprocess /data/maps --output /data/dataset --seed 123
+    """
+    try:
+        # Parse split ratios
+        try:
+            split_parts = [float(x.strip()) for x in split_str.split(",")]
+            if len(split_parts) != 3:
+                raise ValueError("Expected 3 values")
+            split_ratios = {
+                "train": split_parts[0],
+                "val": split_parts[1],
+                "test": split_parts[2],
+            }
+        except (ValueError, IndexError) as e:
+            print_error(f"Invalid split format '{split_str}': {e}")
+            print_error("Expected format: TRAIN,VAL,TEST (e.g., 0.8,0.1,0.1)")
+            sys.exit(EXIT_USER_ERROR)
+
+        def progress_callback(progress: BuildProgress) -> None:
+            """Update progress display."""
+            total = progress.total
+            done = progress.processed + progress.failed + progress.skipped
+            click.echo(
+                f"\rProgress: {done}/{total} "
+                f"(processed: {progress.processed}, "
+                f"failed: {progress.failed}, "
+                f"skipped: {progress.skipped}) "
+                f"- {progress.current_map}",
+                nl=False,
+            )
+
+        click.echo(f"Input directory: {input_dir}")
+        click.echo(f"Output directory: {output_dir}")
+        click.echo(
+            f"Split ratios: train={split_ratios['train']}, "
+            f"val={split_ratios['val']}, test={split_ratios['test']}"
+        )
+        click.echo(f"Random seed: {seed}")
+        if min_size:
+            click.echo(f"Min size filter: {min_size}")
+        if max_size:
+            click.echo(f"Max size filter: {max_size}")
+        click.echo()
+
+        builder = DatasetBuilder(
+            output_dir=output_dir,
+            min_size=min_size,
+            max_size=max_size,
+            split_ratios=split_ratios,
+            seed=seed,
+            progress_callback=progress_callback,
+        )
+
+        result = builder.build(input_dir)
+
+        click.echo()
+        click.echo()
+        print_success("Preprocessing complete!")
+        click.echo(f"  Output: {result.output_dir}")
+        click.echo(f"  Total samples: {result.total_samples}")
+        click.echo(f"  Processed: {result.processed}")
+        click.echo(f"  Failed: {result.failed}")
+        click.echo(f"  Skipped: {result.skipped}")
+        click.echo()
+        click.echo("Splits:")
+        click.echo(f"  Train: {result.split_counts.get('train', 0)}")
+        click.echo(f"  Val: {result.split_counts.get('val', 0)}")
+        click.echo(f"  Test: {result.split_counts.get('test', 0)}")
+
+        if result.failed > 0:
+            click.echo(f"\nSee {output_dir}/errors.json for details on failed maps.")
+
+    except FileNotFoundError as e:
+        print_error(str(e))
+        sys.exit(EXIT_USER_ERROR)
+    except ValueError as e:
         print_error(str(e))
         sys.exit(EXIT_USER_ERROR)
     except Exception as e:
